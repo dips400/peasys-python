@@ -29,7 +29,7 @@ pip install --upgrade peasys
 Peasys is a tool used along a license that should be found on the [dips400](https://dips400.com) website. This license key is required for the use of the service Peasys.
 
 ### Connexion to the server
-Stripe authenticates API requests using your account’s secret key, which you can find in the Stripe Dashboard. By default, secret keys can be used to perform any API request without restriction.
+Peasys authenticates API requests using your license key, which you can find in the [dashboard](https://dips400.com/account).
 
 ```python
 from peasys import pea_client
@@ -57,7 +57,7 @@ conn.disconnect()
 ### Handling exceptions
 
 Unsuccessful requests raise exceptions. The class of the exception will reflect
-the sort of error that occurred. Please see the [documentation](https://stripe.com/docs) for a description of
+the sort of error that occurred. Please see the [documentation](https://dips400.com/docs) for a description of
 the error classes you should handle, and for information on how to inspect
 these errors.
 
