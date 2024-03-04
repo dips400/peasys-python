@@ -48,11 +48,11 @@ class PeaClient:
         self._password = password
         self._license_key = license_key
         self._retreive_statitics = retreive_statistics
-
-        host = "localhost:8080"
-        self.__conn = http.client.HTTPConnection(host)
+        host = "dips400.com"
+        self.__conn = http.client.HTTPSConnection(host)
         self.__conn.request("GET", f"/api/license-key/retrieve-token/{dns_server_name}/{license_key}", headers={"Host": host})
         data = self.__conn.getresponse().read()
+        print(data)
         decoded_data = json.loads(data)
         if not decoded_data["isValid"]:
             raise PeaInvalidLicenseKeyException("Invalid license key, visit TODO for more information")
@@ -331,13 +331,14 @@ class PeaClient:
         command = "updt" + query + _end_pack
         header = self.__retreive_data(command)
         
-        # send statitics if wanted
-        if self._retreive_statitics:
-            self.__send_statitics({"Name": "data_in", "Bytes": len(query.encode('utf-8')), "Date": datetime.now().isoformat()})
-            self.__send_statitics({"Name": "data_out", "Bytes": len(header.encode('utf-8')), "Date": datetime.now().isoformat()})
-
         sql_state = header[:5]
         sql_message = header[5:].strip()
+        
+        # send statitics if wanted
+        if self._retreive_statitics:
+            self.__send_statitics({"Name": "data_in", "Bytes": len(query.encode('utf-8'))})
+            self.__send_statitics({"Name": "data_out", "Bytes": len(header.encode('utf-8'))})
+            self.__send_statitics({"Name": "log", "UserName" : self.username, "Query": query.split(' ')[0], "SqlCode":sql_state, "SqlMessage": sql_message})
 
         row_count = 0
         if (query.upper().startswith("INSERT") or query.upper().startswith("UPDATE") or query.upper().startswith("DELETE")):
@@ -367,8 +368,10 @@ class PeaClient:
         
         # send statitics if wanted
         if self._retreive_statitics:
-            self.__send_statitics({"Name": "data_in", "Bytes": len(query.encode('utf-8')), "Date": datetime.now().isoformat()})
-            self.__send_statitics({"Name": "data_out", "Bytes": len(data.encode('utf-8')), "Date": datetime.now().isoformat()})
+            self.__send_statitics({"Name": "data_in", "Bytes": len(query.encode('utf-8')), "Key": self.license_key})
+            self.__send_statitics({"Name": "data_out", "Bytes": len(data.encode('utf-8')), "Key": self.license_key})
+            self.__send_statitics({"Name": "log", "UserName" : 
+                self.username, "Query": query.split(' ')[0], "SqlCode":sql_state, "SqlMessage": sql_message,"Key": self.license_key})
 
         sum_precision = 0
         result = dict()
@@ -429,7 +432,9 @@ class PeaClient:
 
     def __send_statitics(self, data) -> None:
         body = json.dumps(data, default=str)
+        print(body)
         self.__conn.request("PATCH", f"/api/license-key/update" ,body=body, headers={"Content-Type": "application/json"})
+        _ = self.__conn.getresponse().read()
     
     @property
     def dns_server_name(self) -> str:
