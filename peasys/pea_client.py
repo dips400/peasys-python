@@ -10,8 +10,7 @@ class PeaClient:
     '''
     Represents the client part of the client-server architecture of the Peasys technology.
     '''
-    
-    def __init__(self, dns_server_name, port, username, password, license_key, retreive_statistics=False) -> None:
+    def __init__(self, dns_server_name, port, username, password, id_client, online_version=True, retrieve_statistics=False) -> None:
         '''Initialize a new instance of PeaClient the class.
         
         Args
@@ -24,9 +23,11 @@ class PeaClient:
             Username of the AS/400 profile used for connexion.
         password (str):
             Password of the AS/400 profile used for connexion.
-        license_key (str):
-            License key delivered by DIPS after subscription.
-        retreive_statistics (boolean):
+        id_client (str):
+            ID of the client account on the DIPS website.
+        online_version (boolean):
+            Set to true if you want to use the online version of Peasys. Visit https://dips400.com/docs/connexion" for more informations.
+        retrieve_statistics (boolean):
             If set to true, statistics of Peasys' use will be sent to a database. Default is False.
 
         Raises
@@ -36,7 +37,8 @@ class PeaClient:
         PeaConnexionException
             If client couldn't connect to remote server.
         '''
-        if(not dns_server_name or not port or not username or not password or not license_key):
+        
+        if(not dns_server_name or not port or not username or not password or not id_client):
             raise PeaInvalidCredentialsException("Fields of the PeaClient instance cannot be empty.")
 
         if(len(username) > 10 or len(password) > 10):
@@ -46,27 +48,28 @@ class PeaClient:
         self._port = port
         self._username = username
         self._password = password
-        self._license_key = license_key
-        self._retreive_statitics = retreive_statistics
-        host = "dips400.com"
-        self.__conn = http.client.HTTPSConnection(host)
-        self.__conn.request("GET", f"/api/license-key/retrieve-token/{dns_server_name}/{license_key}", headers={"Host": host})
-        data = self.__conn.getresponse().read()
-        print(data)
-        decoded_data = json.loads(data)
-        if not decoded_data["isValid"]:
-            raise PeaInvalidLicenseKeyException("Invalid license key, visit TODO for more information")
+        self._id_client = id_client
+        self._retreive_statitics = retrieve_statistics
         
-        token = decoded_data["token"]
-        # TODO send token
+        token = "pldgchjtsxlqyfucjstpldgchjcjstemzplfpldgchjtsxlqyfucjstemzplfutysnchqternoutysnchqternoemzplfutysnchqterno"
+        if online_version:
+            host = "localhost:8080"
+            self.__conn = http.client.HTTPConnection(host)
+            self.__conn.request("GET", f"/api/license-key/retrieve-token/{dns_server_name}/{id_client}", headers={"Host": host})
+            data = self.__conn.getresponse().read()
+            decoded_data = json.loads(data)
+            if not decoded_data["isValid"]:
+                raise PeaInvalidLicenseKeyException("Invalid license key, visit TODO for more information")
         
+            token = decoded_data["token"]
+
         self._clientsocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             self._clientsocket.connect((dns_server_name, port))
         except:
             raise ConnectionError("Error connecting the socket to the client")
 
-        login = username.ljust(10, " ") + password.ljust(10, " ") 
+        login = username.ljust(10, " ") + token.ljust(100) + password.ljust(10, " ") 
         self._clientsocket.send(login.encode('iso-8859-1'))
 
         self._connexion_status = int(self._clientsocket.recv(1).decode('iso-8859-1'))
@@ -74,7 +77,8 @@ class PeaClient:
         self._connexion_message = ""
         match self._connexion_status:
             case 1:
-                self.__send_statitics({"Name": "username", "Date": datetime.now().isoformat(), "Key": license_key})
+                if online_version:
+                    self.__send_statitics({"Name": "username", "IdClient": id_client, "PartitionName" : dns_server_name})
                 self._connexion_message = "Connected"
             case 2:
                 self._connexion_message = "Unable to set profile"
@@ -336,9 +340,9 @@ class PeaClient:
         
         # send statitics if wanted
         if self._retreive_statitics:
-            self.__send_statitics({"Name": "data_in", "Bytes": len(query.encode('utf-8'))})
-            self.__send_statitics({"Name": "data_out", "Bytes": len(header.encode('utf-8'))})
-            self.__send_statitics({"Name": "log", "UserName" : self.username, "Query": query.split(' ')[0], "SqlCode":sql_state, "SqlMessage": sql_message})
+            self.__send_statitics({"Name": "data_in", "Bytes": len(query.encode('utf-8')), "IdClient": self._id_client, "PartitionName" : self._dns_server_name})
+            self.__send_statitics({"Name": "data_out", "Bytes": len(header.encode('utf-8')), "IdClient": self._id_client, "PartitionName" : self._dns_server_name})
+            self.__send_statitics({"Name": "log", "UserName" : self.username, "Query": query.split(' ')[0], "SqlCode":sql_state, "SqlMessage": sql_message, "IdClient": self._id_client, "PartitionName" : self._dns_server_name})
 
         row_count = 0
         if (query.upper().startswith("INSERT") or query.upper().startswith("UPDATE") or query.upper().startswith("DELETE")):
@@ -368,10 +372,10 @@ class PeaClient:
         
         # send statitics if wanted
         if self._retreive_statitics:
-            self.__send_statitics({"Name": "data_in", "Bytes": len(query.encode('utf-8')), "Key": self.license_key})
-            self.__send_statitics({"Name": "data_out", "Bytes": len(data.encode('utf-8')), "Key": self.license_key})
+            self.__send_statitics({"Name": "data_in", "Bytes": len(query.encode('utf-8')), "IdClient": self._id_client, "PartitionName" : self._dns_server_name})
+            self.__send_statitics({"Name": "data_out", "Bytes": len(data.encode('utf-8')), "IdClient": self._id_client, "PartitionName" : self._dns_server_name})
             self.__send_statitics({"Name": "log", "UserName" : 
-                self.username, "Query": query.split(' ')[0], "SqlCode":sql_state, "SqlMessage": sql_message,"Key": self.license_key})
+                self.username, "Query": query.split(' ')[0], "SqlCode":sql_state, "SqlMessage": sql_message, "IdClient": self._id_client, "PartitionName" : self._dns_server_name})
 
         sum_precision = 0
         result = dict()
@@ -432,7 +436,6 @@ class PeaClient:
 
     def __send_statitics(self, data) -> None:
         body = json.dumps(data, default=str)
-        print(body)
         self.__conn.request("PATCH", f"/api/license-key/update" ,body=body, headers={"Content-Type": "application/json"})
         _ = self.__conn.getresponse().read()
     
@@ -486,7 +489,7 @@ class PeaClient:
         return self._connexion_message
     
     @property
-    def retreive_statistics(self) -> bool:
+    def retrieve_statistics(self) -> bool:
         '''
         Boolean set to true if statitics of Peasys' use are saved
         '''
