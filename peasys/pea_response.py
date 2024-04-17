@@ -341,7 +341,7 @@ class ColumnInfo:
         ColumnInfo is used to represent the informations about one column in the table in case the user want to retrieve the table's schema.
     '''
     
-    def __init__(self, column_name, ordinal_position, data_type, length, numeric_scale, is_nullable, is_updatable, long_comment, numeric_precision) -> None:
+    def __init__(self, column_name, ordinal_position, data_type, length, numeric_scale, is_nullable, is_updatable, numeric_precision) -> None:
         '''
         Initialize a new instance of ColumnInfo class.
             
@@ -361,8 +361,6 @@ class ColumnInfo:
                 True is the field is nullable.
             is_updatable (bool):
                 True is the field is updatable.
-            long_comment (str):
-                Description of the field.
             numeric_precision (int):
                 Numeric precision if data s=is of type numeric.
         '''
@@ -373,7 +371,6 @@ class ColumnInfo:
         self._numeric_scale = numeric_scale
         self._is_nullable = is_nullable
         self._is_updatable = is_updatable
-        self._long_comment = long_comment
         self._numeric_precision = numeric_precision
 
     @property
@@ -424,13 +421,6 @@ class ColumnInfo:
         True is the field is updatable.
         '''
         return self._is_updatable
-    
-    @property
-    def long_comment(self) -> str:
-        '''
-        Description of the field.
-        '''
-        return self._long_comment
     
     @property
     def numeric_precision(self) -> int:

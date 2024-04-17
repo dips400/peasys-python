@@ -40,9 +40,6 @@ class PeaClient:
         
         if(not dns_server_name or not port or not username or not password or not id_client):
             raise PeaInvalidCredentialsException("Fields of the PeaClient instance cannot be empty.")
-
-        if(len(username) > 10 or len(password) > 10):
-            raise PeaInvalidCredentialsException("Username and Password cannot be more 10 characters long.")
         
         self._dns_server_name = dns_server_name
         self._port = port
@@ -69,7 +66,8 @@ class PeaClient:
         except:
             raise ConnectionError("Error connecting the socket to the client")
 
-        login = username.ljust(10, " ") + token.ljust(100) + password.ljust(10, " ") 
+        #login = username.ljust(10, " ") + token.ljust(100) + password
+        login = username.ljust(10, " ") + password.ljust(10, " ")
         self._clientsocket.send(login.encode('iso-8859-1'))
 
         self._connexion_status = int(self._clientsocket.recv(1).decode('iso-8859-1'))
@@ -163,9 +161,14 @@ class PeaClient:
 
         # retreive table schema if a table has been created 
         tb_schema = None
-        #if (query_words[1].ToUpper() == "TABLE"):
-        #    string[] names = query_words[2].Split('/');
-        #    tb_schema = RetreiveTableSchema(names[1], names[0]);
+        if (query_words[1].ToUpper() == "TABLE"):
+            names = query_words[2].split('/')
+            tb_query = """SELECT COLUMN_NAME, ORDINAL_POSITION, DATA_TYPE, LENGTH, NUMERIC_SCALE, IS_NULLABLE, IS_UPDATABLE, NUMERIC_PRECISION
+                    FROM QSYS2.SYSCOLUMNS WHERE SYSTEM_TABLE_NAME = '""" + names[1].upper() + "' AND SYSTEM_TABLE_SCHEMA = '" + names[0].upper() + "'"
+            (result, _, row_count, _, _) = self.__build_data(tb_query)
+            for i in range(0, row_count):
+                tb_schema[result["column_name"][i]] = ColumnInfo(result["column_name"][i], result["ordinal_position"][i], result["data_type"][i], result["length"][i], 
+                    result["numeric_scale"][i], result["is_nullable"][i], result["is_updatable"][i], result["numeric_precision"][i])
 
         match query_words[1].upper():
             case "TABLE":
@@ -220,12 +223,19 @@ class PeaClient:
         (_, sql_state, sql_message) = self.__modify_table(query)
 
         # reteive table schema if wanted
-        tb_schema = None
+        tb_schema = dict()
         if (retreive_table_schema):
             query_words = query.split(' ')
             names = query_words[2].split('/')
-            #tb_schema = RetreiveTableSchema(names[1], names[0]);
-
+            tb_query = """SELECT COLUMN_NAME, ORDINAL_POSITION, DATA_TYPE, LENGTH, NUMERIC_SCALE, IS_NULLABLE, IS_UPDATABLE, NUMERIC_PRECISION
+                    FROM QSYS2.SYSCOLUMNS WHERE SYSTEM_TABLE_NAME = '""" + names[1].upper() + "' AND SYSTEM_TABLE_SCHEMA = '" + names[0].upper() + "'"
+                    
+            (result, _, row_count, _, _) = self.__build_data(tb_query)
+            
+            for i in range(0, row_count):
+                tb_schema[result["column_name"][i]] = ColumnInfo(result["column_name"][i], result["ordinal_position"][i], result["data_type"][i], result["length"][i], 
+                    result["numeric_scale"][i], result["is_nullable"][i], result["is_updatable"][i], result["numeric_precision"][i])
+        
         return PeaAlterResponse(sql_state == "00000", sql_message, sql_state, tb_schema)
 
     def execute_drop(self, query) -> PeaDropResponse:
@@ -433,7 +443,7 @@ class PeaClient:
             data += str(self._clientsocket.recv(1).decode('iso-8859-1'))
 
         return data[:len(data)-len(_end_pack)]
-
+    
     def __send_statitics(self, data) -> None:
         body = json.dumps(data, default=str)
         self.__conn.request("PATCH", f"/api/license-key/update" ,body=body, headers={"Content-Type": "application/json"})
