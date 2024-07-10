@@ -10,13 +10,15 @@ class PeaClient:
     '''
     Represents the client part of the client-server architecture of the Peasys technology.
     '''
-    def __init__(self, dns_server_name, port, username, password, id_client, online_version=True, retrieve_statistics=False) -> None:
+    def __init__(self, dns_server_name, partition_name, port, username, password, id_client, online_version=True, retrieve_statistics=False) -> None:
         '''Initialize a new instance of PeaClient the class.
         
         Args
         ------
         dns_server_name (str):
             DNS name of the remote AS/400 server.
+        partition_name (str) :
+            Name of the partition.
         port (int):
             Port used for the data exchange between the client and the server.
         username (str):
@@ -33,7 +35,7 @@ class PeaClient:
         Raises
         ------
         PeaInvalidCredentialsException
-            If username || password || model_number || serie_number are wrong.
+            If username || password are wrong.
         PeaConnexionException
             If client couldn't connect to remote server.
         '''
@@ -43,22 +45,27 @@ class PeaClient:
         
         self._dns_server_name = dns_server_name
         self._port = port
+        self._partition_name = partition_name
         self._username = username
         self._password = password
         self._id_client = id_client
         self._retreive_statitics = retrieve_statistics
         
-        token = "pldgchjtsxlqyfucjstpldgchjcjstemzplfpldgchjtsxlqyfucjstemzplfutysnchqternoutysnchqternoemzplfutysnchqterno"
+        # retrieve connexion token online
+        token = "xqdsg27010wmca6052009050000000IDSP1tiupozxreybjhlk" # default token in case of offline verification
         if online_version:
-            host = "localhost:8080"
-            self.__conn = http.client.HTTPConnection(host)
-            self.__conn.request("GET", f"/api/license-key/retrieve-token/{dns_server_name}/{id_client}", headers={"Host": host})
-            data = self.__conn.getresponse().read()
-            decoded_data = json.loads(data)
-            if not decoded_data["isValid"]:
-                raise PeaInvalidLicenseKeyException("Invalid license key, visit TODO for more information")
+            try:
+                host = "dips400.com"
+                self.__conn = http.client.HTTPConnection(host)
+                self.__conn.request("GET", f"/api/license-key/retrieve-token/{partition_name}/{id_client}", headers={"Host": host})
+                data = self.__conn.getresponse().read()
+                decoded_data = json.loads(data)
+                token = decoded_data["token"]
+                if not decoded_data["isValid"]:
+                    raise PeaInvalidLicenseKeyException("Your subscription is not valid, visit https://dips400.com/account/subscriptions for more information.")
+            except:
+                pass # If dips400.com doesn't respond, let's try an affline verification with the offline token
         
-            token = decoded_data["token"]
 
         self._clientsocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
@@ -66,30 +73,46 @@ class PeaClient:
         except:
             raise ConnectionError("Error connecting the socket to the client")
 
-        #login = username.ljust(10, " ") + token.ljust(100) + password
-        login = username.ljust(10, " ") + password.ljust(10, " ")
+        login = username.ljust(10, " ") + token.ljust(50, " ") + password
         self._clientsocket.sendall(login.encode('iso-8859-1'))
 
-        self._connexion_status = int(self._clientsocket.recv(1).decode('iso-8859-1'))
+        self._connexion_status = self._clientsocket.recv(1).decode('iso-8859-1')
 
         self._connexion_message = ""
         match self._connexion_status:
-            case 1:
+            case "1":
                 if online_version:
                     self.__send_statitics({"Name": "username", "IdClient": id_client, "PartitionName" : dns_server_name})
                 self._connexion_message = "Connected"
-            case 2:
-                self._connexion_message = "Unable to set profile"
-                raise PeaInvalidCredentialsException("Unable to set profile")
-            case 3:
+                self._connexion_status = 1
+            case "2":
+                self._connexion_message = "Unable to set profile, check profile validity."
+                self._connexion_status = 2
+                raise PeaInvalidCredentialsException("Unable to set profile, check profile validity.")
+            case "3":
                 self._connexion_message = "Invalid credential"
-                raise PeaInvalidCredentialsException("Invalid username or password, check again")
-            case 4:
-                self._connexion_message = "Invalid serial number/model"
-                raise PeaInvalidCredentialsException("Invalid Invalid serial number/model, check again")
-            case 5:
-                self._connexion_message = "Product expired"
-                raise PeaConnexionException("Products expired")
+                self._connexion_status = 3
+                raise PeaInvalidCredentialsException("Invalid username or password, check again.")
+            case "B":
+                self._connexion_message = "Peasys Online : your token connexion is no longer valid, retry to connect."
+                self._connexion_status = 5
+                raise PeaInvalidCredentialsException("Peasys Online : your token connexion is no longer valid, retry to connect.")
+            case "D":
+                self._connexion_message = "Peasys Online : the partition name you provided doesn't match the actual name of the machine."
+                self._connexion_status = 6
+                raise PeaConnexionException("Peasys Online : the partition name you provided doesn't match the actual name of the machine.")
+            case "E":
+                self._connexion_message = "You reached the max number of simultaneously connected peasys users for that partition and license key. Contact us for upgrading your license."
+                self._connexion_status = 7
+                raise PeaConnexionException("You reached the max number of simultaneously connected peasys users for that partition and license key. Contact us for upgrading your license.")
+            case "F":
+                self._connexion_message = "Your license is no longer valid. Subscribe to another license in order to continue using Peasys."
+                self._connexion_status = 8
+                raise PeaConnexionException("Your license is no longer valid. Subscribe to another license in order to continue using Peasys.")
+            case "0" | "A" | "C" | "G":
+                self._connexion_message = "Error linked to DIPS source code. Please, contact us immediatly to fix the issue."
+                self._connexion_status = -1
+                raise PeaConnexionException("Error linked to DIPS source code. Please, contact us immediatly to fix the issue.")
             case _:
                 raise PeaConnexionException("Exception during connexion process, contact us for more informations")    
         
@@ -337,6 +360,7 @@ class PeaClient:
         '''Closes the TCP connexion with the server.
         '''
         self._clientsocket.sendall("stopdipsjbiemg".encode())
+        self._clientsocket.flu
         self._clientsocket.close()
 
     def __modify_table(self, query):
