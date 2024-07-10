@@ -68,7 +68,7 @@ class PeaClient:
 
         #login = username.ljust(10, " ") + token.ljust(100) + password
         login = username.ljust(10, " ") + password.ljust(10, " ")
-        self._clientsocket.send(login.encode('iso-8859-1'))
+        self._clientsocket.sendall(login.encode('iso-8859-1'))
 
         self._connexion_status = int(self._clientsocket.recv(1).decode('iso-8859-1'))
 
@@ -336,7 +336,7 @@ class PeaClient:
     def disconnect(self):
         '''Closes the TCP connexion with the server.
         '''
-        self._clientsocket.send("stopdipsjbiemg".encode())
+        self._clientsocket.sendall("stopdipsjbiemg".encode())
         self._clientsocket.close()
 
     def __modify_table(self, query):
@@ -436,7 +436,7 @@ class PeaClient:
     
     def __retreive_data(self, command) -> str:
         _end_pack = "dipsjbiemg"
-        self._clientsocket.send(command.encode('iso-8859-1'))
+        self._clientsocket.sendall(command.encode('iso-8859-1'))
 
         data = "[" if command.startswith("geth") else ""
         while (len(data) < len(_end_pack) or data[-len(_end_pack):] != _end_pack):
