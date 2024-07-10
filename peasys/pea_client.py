@@ -56,13 +56,17 @@ class PeaClient:
         if online_version:
             try:
                 host = "dips400.com"
-                self.__conn = http.client.HTTPConnection(host)
-                self.__conn.request("GET", f"/api/license-key/retrieve-token/{partition_name}/{id_client}", headers={"Host": host})
+                self.__conn = http.client.HTTPSConnection(host)
+                self.__conn.request("GET", f"/api/license-key/retrieve-token/{partition_name}/{id_client}")
                 data = self.__conn.getresponse().read()
                 decoded_data = json.loads(data)
                 token = decoded_data["token"]
+                
                 if not decoded_data["isValid"]:
                     raise PeaInvalidLicenseKeyException("Your subscription is not valid, visit https://dips400.com/account/subscriptions for more information.")
+                
+            except PeaInvalidLicenseKeyException as error:
+                raise error
             except:
                 pass # If dips400.com doesn't respond, let's try an affline verification with the offline token
         
