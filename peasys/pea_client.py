@@ -36,7 +36,9 @@ class PeaClient:
         ------
         PeaInvalidCredentialsException
             If username || password are wrong.
-        PeaConnexionException
+        PeaInvalidLicenseKeyException
+            If your subscription is not valid.
+        ConnectionError
             If client couldn't connect to remote server.
         '''
         
@@ -342,23 +344,19 @@ class PeaClient:
         
         result_raw = self.__retreive_data(customCmd)
         result = []
-        has_succeeded = True
         try:
             
             for match in re.finditer(rx, result_raw):
-                if (not match.group().startswith("CPI")):
+                if (not match.group().startswith("CPI") and match.span()[0] + descriptionOffset < len(result_raw)):
                     description = result_raw[match.span()[0] + descriptionOffset:]
                     description = description[:description.index('.')]
                     description = re.sub(rgx, "", description)
                     
                     result.append(match.group() + " " + description)
 
-                if (match.group().startswith("CPF")):
-                    has_succeeded = False
-
-            return PeaCommandResponse(has_succeeded, result)
+            return PeaCommandResponse(result)
         except:
-            return PeaCommandResponse(False, result)
+            return PeaCommandResponse(result)
 
     def disconnect(self):
         '''Closes the TCP connexion with the server.

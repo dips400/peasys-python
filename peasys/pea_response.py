@@ -306,27 +306,16 @@ class PeaCommandResponse:
         Represents the concept of response in the case of an OS/400 command executed on the database of an AS/400 server by a PeaClient object.
     '''
     
-    def __init__(self, has_succeeded, warnings) -> None:
+    def __init__(self, warnings) -> None:
         '''
         Initialize a new instance of the PeaCommandResponse class.
             
         Args
         -----
-            has_succeeded (bool):
-                Boolean set to true if the command has correctly been executed meaning that no CPFxxxx was return. Still, description messages 
-                    can be return along with CP*xxxx.
             warnings (list of string):
                 List of warnings that results form the command execution. Errors are of the form : CP*xxxx Description of the warning.
         '''
-        self._has_succeeded = has_succeeded
         self._warnings = warnings
-        
-    @property
-    def has_succeeded(self) -> bool:
-        '''
-        Boolean set to true if the command has correctly been executed meaning that no CPFxxxx was return.
-        '''
-        return self._has_succeeded
     
     @property
     def warnings(self) -> list:

@@ -1,3 +1,15 @@
+Metadata-Version: 2.1
+Name: peasys
+Version: 1.0.2
+Summary: A clear and concise python client for IBM Db2 and peasys service
+Home-page: https://github.com/dips400/peasys-python
+Author: DIPS
+Author-email: dips@dips400.com
+License: MIT
+Keywords: ibm db2 peasys
+Description-Content-Type: text/markdown
+License-File: LICENSE
+
 # Peasys Python Library
 
 The Peasys Python library provides convenient tools for interacting with the Peasys service.
